@@ -169,5 +169,26 @@ export const SORTS = [
 
 export const TORRENT_DETAILS = ["size", "ratio", "peers", "category", "tags", "added", "path"] as const;
 
+// --- Top card --------------------------------------------------------------
+
+export interface MetricDef {
+  /** How the value is formatted. */
+  kind: "bytes" | "speed" | "ratio" | "count" | "duration";
+  icon: string;
+  color: Color;
+}
+
+/** Torrent properties the top card ranks by (all sortable by qbt.get_torrents). */
+export const TOP_METRICS: Record<string, MetricDef> = {
+  uploaded: { kind: "bytes", icon: "mdi:upload-network", color: "green" },
+  upspeed: { kind: "speed", icon: "mdi:upload", color: "green" },
+  ratio: { kind: "ratio", icon: "mdi:scale-balance", color: "teal" },
+  num_leechs: { kind: "count", icon: "mdi:account-arrow-down", color: "purple" },
+  seeding_time: { kind: "duration", icon: "mdi:timer-outline", color: "teal" },
+  downloaded: { kind: "bytes", icon: "mdi:download-network", color: "blue" },
+  dlspeed: { kind: "speed", icon: "mdi:download", color: "blue" },
+  size: { kind: "bytes", icon: "mdi:harddisk", color: "grey" },
+};
+
 /** qBittorrent's "infinite" ETA. */
 export const ETA_INFINITE = 8640000;

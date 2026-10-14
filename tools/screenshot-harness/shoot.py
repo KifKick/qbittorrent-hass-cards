@@ -20,6 +20,7 @@ README_SHOTS = {
     "overview-card": "lang=en&scenario=docs-overview",
     "overview-compact": "lang=en&scenario=docs-compact",
     "torrents-card": "lang=en&scenario=docs-torrents,open",
+    "top-card": "lang=en&scenario=docs-top",
 }
 
 

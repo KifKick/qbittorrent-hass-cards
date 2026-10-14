@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { configEntryId, getQbtDevices, resolveDevice, resolveEntities, webUiUrl } from "./discovery";
-import { entityBytes, formatBytes, formatEta, formatProgress, formatRatio } from "./format";
+import { entityBytes, formatBytes, formatDuration, formatEta, formatProgress, formatRatio } from "./format";
 import type { DeviceRegistryEntry, HassEntity, HomeAssistant } from "./ha-types";
 import {
   CONTROLS,
@@ -9,13 +9,14 @@ import {
   OVERVIEW_SECTIONS,
   SORTS,
   STATS,
+  TOP_METRICS,
   TORRENT_DETAILS,
   TORRENT_STATES,
   UNKNOWN_STATE,
 } from "./const";
 import { LOCALES, plural, t } from "./i18n";
 import { appendPoint, sparkPaths } from "./sparkline";
-import { type Torrent, torrentSummary } from "./torrent";
+import { formatMetric, metricValue, rankTorrents, type Torrent, torrentSummary } from "./torrent";
 
 const device = (id: string, entryId: string, name: string): DeviceRegistryEntry => ({
   id,
@@ -172,6 +173,7 @@ describe("i18n", () => {
         .map(([k]) => `confirm_${k}`),
       ...FILTERS.map((k) => `filter_${k}`),
       ...SORTS.map((k) => `sort_${k}`),
+      ...Object.keys(TOP_METRICS).flatMap((k) => [`metric_${k}`, `metric_${k}_short`]),
       ...TORRENT_DETAILS.map((k) => `detail_${k}`),
       ...OVERVIEW_SECTIONS.map((k) => `ed_section_${k}`),
       ...[...Object.values(TORRENT_STATES), UNKNOWN_STATE].map((d) => `state_${d.group}`),
@@ -232,6 +234,63 @@ describe("torrent summary", () => {
 
   it("handles unknown states", () => {
     expect(torrentSummary(hass, { ...base, state: "somethingNew" })).toBe("Unknown");
+  });
+});
+
+describe("top torrents", () => {
+  const hass = makeHass();
+  const torrent = (hash: string, extra: Partial<Torrent>): Torrent => ({
+    hash,
+    name: hash,
+    state: "uploading",
+    progress: 1,
+    size: 1e9,
+    dlspeed: 0,
+    upspeed: 0,
+    eta: 0,
+    ratio: 0,
+    ...extra,
+  });
+
+  it("ranks by the metric, scaled against the leader, skipping zeros", () => {
+    const ranked = rankTorrents(
+      [
+        torrent("b", { uploaded: 2e9 }),
+        torrent("a", { uploaded: 8e9 }),
+        torrent("c", { uploaded: 0 }),
+        torrent("d", { uploaded: 4e9 }),
+      ],
+      "uploaded",
+      2,
+    );
+    expect(ranked.map((r) => [r.torrent.hash, r.fraction])).toEqual([
+      ["a", 1],
+      ["d", 0.5],
+    ]);
+  });
+
+  it("treats infinite ratios as the top without flattening the rest", () => {
+    const ranked = rankTorrents(
+      [torrent("inf", { ratio: -1 }), torrent("x", { ratio: 4 }), torrent("y", { ratio: 2 })],
+      "ratio",
+      5,
+    );
+    expect(metricValue(torrent("big", { ratio: 9999 }), "ratio")).toBe(Infinity);
+    expect(ranked.map((r) => [r.torrent.hash, r.fraction])).toEqual([
+      ["inf", 1],
+      ["x", 1],
+      ["y", 0.5],
+    ]);
+    expect(formatMetric(hass, "ratio", Infinity)).toBe("∞");
+  });
+
+  it("formats each kind of metric", () => {
+    expect(formatMetric(hass, "uploaded", 3 * 1024 ** 3)).toBe("3.00 GiB");
+    expect(formatMetric(hass, "upspeed", 1_500_000, "decimal")).toBe("1.50 MB/s");
+    expect(formatMetric(hass, "ratio", 3.751)).toBe("3.75");
+    expect(formatMetric(hass, "num_leechs", 12)).toBe("12");
+    expect(formatMetric(hass, "seeding_time", 200 * 86400 + 3 * 3600)).toBe("200 d 3 h");
+    expect(formatDuration(59)).toBe("59 s");
   });
 });
 

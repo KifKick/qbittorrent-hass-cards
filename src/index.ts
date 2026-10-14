@@ -3,9 +3,10 @@
 // entity or device).
 
 import { DOMAIN } from "./const";
-import { QbtOverviewCardEditor, QbtTorrentsCardEditor } from "./editors";
+import { QbtOverviewCardEditor, QbtTopCardEditor, QbtTorrentsCardEditor } from "./editors";
 import type { HomeAssistant } from "./ha-types";
 import { QbtOverviewCard } from "./overview-card";
+import { QbtTopCard } from "./top-card";
 import { QbtTorrentsCard } from "./torrents-card";
 
 declare const __CARD_VERSION__: string; // injected by build.mjs from package.json
@@ -17,20 +18,25 @@ const ELEMENTS: [string, CustomElementConstructor][] = [
   ["qbt-overview-card-editor", QbtOverviewCardEditor],
   ["qbt-torrents-card", QbtTorrentsCard],
   ["qbt-torrents-card-editor", QbtTorrentsCardEditor],
+  ["qbt-top-card", QbtTopCard],
+  ["qbt-top-card-editor", QbtTopCardEditor],
 ];
 
-// Guarded, so loading the file twice (e.g. a leftover manual resource next to
-// the HACS one) doesn't throw on a duplicate define().
-if (!customElements.get("qbt-overview-card")) {
-  for (const [tag, element] of ELEMENTS) customElements.define(tag, element);
+// Guarded per element, so loading the file twice (e.g. a leftover manual
+// resource next to the HACS one) doesn't throw on a duplicate define(), and a
+// newer copy still adds cards an older one loaded first doesn't have.
+const missing = ELEMENTS.filter(([tag]) => !customElements.get(tag));
+if (missing.length) {
+  for (const [tag, element] of missing) customElements.define(tag, element);
 
   const deviceIdFor = (hass: HomeAssistant, entityId: string): string | undefined => {
     const entry = hass.entities?.[entityId];
     return entry?.platform === DOMAIN ? entry.device_id : undefined;
   };
 
-  const cards = (window as any).customCards ?? ((window as any).customCards = []);
-  cards.push(
+  const cards: { type: string }[] = (window as any).customCards ?? ((window as any).customCards = []);
+  const listed = new Set(cards.map((card) => card.type));
+  const ours = [
     {
       type: "qbt-overview-card",
       name: "qBittorrent Overview",
@@ -57,7 +63,21 @@ if (!customElements.get("qbt-overview-card")) {
           : undefined;
       },
     },
-  );
+    {
+      type: "qbt-top-card",
+      name: "qBittorrent Top Torrents",
+      description: "Top torrents by upload, ratio, speed, leechers or seeding time.",
+      preview: true,
+      documentationURL: DOCS_URL,
+      getEntitySuggestion(hass: HomeAssistant, entityId: string) {
+        const deviceId = deviceIdFor(hass, entityId);
+        return deviceId
+          ? [{ config: { type: "custom:qbt-top-card", device_id: deviceId } }]
+          : undefined;
+      },
+    },
+  ];
+  cards.push(...ours.filter((card) => !listed.has(card.type)));
 
   console.info(
     `%c QBITTORRENT-HASS-CARDS %c ${__CARD_VERSION__} `,

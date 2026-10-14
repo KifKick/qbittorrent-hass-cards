@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/KifKick/qbittorrent-hass-cards)](https://github.com/KifKick/qbittorrent-hass-cards/releases)
 [![CI](https://github.com/KifKick/qbittorrent-hass-cards/actions/workflows/ci.yml/badge.svg)](https://github.com/KifKick/qbittorrent-hass-cards/actions/workflows/ci.yml)
 
-Dashboard cards for the [qBittorrent (Advanced)](https://github.com/KifKick/qbittorrent-hass) Home Assistant integration: an overview of your qBittorrent client and a live torrent list you can act on. One HACS entry, one JavaScript file, two cards, in the style of [Mushroom](https://github.com/piitaya/lovelace-mushroom).
+Dashboard cards for the [qBittorrent (Advanced)](https://github.com/KifKick/qbittorrent-hass) Home Assistant integration: an overview of your qBittorrent client and a live torrent list you can act on. One HACS entry, one JavaScript file, three cards, in the style of [Mushroom](https://github.com/piitaya/lovelace-mushroom).
 
 ![Overview card, light and dark](docs/images/overview-card.png)
 
@@ -12,6 +12,7 @@ Dashboard cards for the [qBittorrent (Advanced)](https://github.com/KifKick/qbit
 
 - **Overview card**: connection status, download/upload speed with the current limit and a speed history graph, torrent counts, free space, share ratio, and buttons for alternative speed limits and pause/resume all. There's also a one-row compact layout.
 - **Torrents card**: a live, paged list of torrents with qBittorrent's own filters, progress bars and per-torrent details. Each torrent can be paused/resumed, force-started, reannounced, rechecked or removed (with or without its files).
+- **Top torrents card**: a top-N leaderboard by upload, share ratio, upload/download speed, leechers, seeding time or size, with a bar against the leader.
 - **No entity configuration**: pick the qBittorrent instance and the cards find its entities themselves, whatever the entity IDs or UI language.
 - **Visual editors** for every option, in English and Polish.
 - **Mushroom look**, driven by Mushroom's own `--mush-*` theme variables, in light and dark themes.
@@ -20,7 +21,7 @@ Dashboard cards for the [qBittorrent (Advanced)](https://github.com/KifKick/qbit
 ## Requirements
 
 - Home Assistant 2025.1 or newer.
-- [qBittorrent (Advanced)](https://github.com/KifKick/qbittorrent-hass) **0.2.6 or newer**. The torrents card uses the `limit` option of `qbt.get_torrents`, which arrived in 0.2.6; with an older integration the card tells you to update it.
+- [qBittorrent (Advanced)](https://github.com/KifKick/qbittorrent-hass) **0.2.6 or newer**. The torrents and top cards use the `limit` option of `qbt.get_torrents`, which arrived in 0.2.6; with an older integration the card tells you to update it.
 
 ## Installation
 
@@ -38,12 +39,12 @@ HACS registers the dashboard resource for you and updates it with each release.
 ### Manual
 
 1. Download `qbittorrent-hass-cards.js` from the [latest release](https://github.com/KifKick/qbittorrent-hass-cards/releases/latest) into your `config/www/` folder.
-2. Go to **Settings → Dashboards → ⋮ → Resources → Add resource**, enter `/local/qbittorrent-hass-cards.js?v=0.1.0` and choose **JavaScript module**.
+2. Go to **Settings → Dashboards → ⋮ → Resources → Add resource**, enter `/local/qbittorrent-hass-cards.js?v=0.2.0` and choose **JavaScript module**.
 3. Reload the browser. When you update the file later, bump the `?v=` value so browsers fetch the new version.
 
 ## Usage
 
-Open a dashboard in edit mode, choose **Add card** and pick **qBittorrent Overview** or **qBittorrent Torrents**. Both cards are also suggested when you add a card from any qBittorrent (Advanced) entity. Everything below can be set in the visual editor; the YAML is for reference.
+Open a dashboard in edit mode, choose **Add card** and pick **qBittorrent Overview**, **qBittorrent Torrents** or **qBittorrent Top Torrents**. All three are also suggested when you add a card from any qBittorrent (Advanced) entity. Everything below can be set in the visual editor; the YAML is for reference.
 
 With a single qBittorrent instance, `device_id` can be left out. With several, set it to pick the instance (the editor shows a device picker).
 
@@ -117,6 +118,35 @@ Tap a torrent to see its details and actions:
 
 The list doesn't come from a sensor. The card calls `qbt.get_torrents` with a `limit`, so only one page is transferred. It refreshes every `refresh_interval` seconds while it's on screen and the browser tab is visible. That keeps the list fast and complete even with thousands of torrents, where the integration's torrent-list sensor would be truncated.
 
+### Top torrents card
+
+```yaml
+type: custom:qbt-top-card
+device_id: <qBittorrent device>
+metric: uploaded
+count: 5
+metrics: [uploaded, upspeed, ratio, num_leechs, seeding_time]  # optional: switch on the card
+```
+
+![Top torrents card with switchable rankings, and a fixed one by upload speed, light and dark](docs/images/top-card.png)
+
+| Option | Default | Description |
+|---|---|---|
+| `device_id` | first qBittorrent device | Which qBittorrent (Advanced) instance to show. |
+| `metric` | `uploaded` | What to rank by: `uploaded`, `upspeed`, `ratio`, `num_leechs` (connected leechers), `seeding_time`, `downloaded`, `dlspeed`, `size`. |
+| `metrics` | `[]` | Rankings to switch between with chips on the card, e.g. `[uploaded, upspeed, ratio]`. Empty keeps `metric` fixed. With a list, `metric` is the one shown first. |
+| `count` | `5` | How many torrents to show (1–50). |
+| `filter` | `all` | Which torrents take part, using the same filters as the torrents card (e.g. `seeding`, `active`). |
+| `title` | `Top <count> · <metric>` | Card title. |
+| `icon` | depends on `metric` | Header icon. |
+| `show_bars` | `true` | Bar under each torrent, relative to the first one. |
+| `category` | none | Only rank torrents in this category. |
+| `tag` | none | Only rank torrents with this tag. |
+| `refresh_interval` | `30` | Seconds between refreshes. |
+| `units` | `binary` | `binary` or `decimal`, as on the overview card. |
+
+qBittorrent sorts the torrents and the card asks only for `count` of them, so it stays light with thousands of torrents. Torrents with nothing to show for the metric (no upload, 0 B/s, no leechers) are left out. A torrent with an infinite share ratio (nothing downloaded) is shown as `∞` at the top. Like the torrents card, it only polls while it's on screen and the tab is visible.
+
 ## Theming
 
 The cards read the same theme variables as Mushroom, with the same defaults, so a Mushroom theme or `card_mod` override restyles them too:
@@ -149,7 +179,7 @@ The cards follow the Home Assistant user's language. English and Polish are incl
 ## Troubleshooting
 
 - **"Custom element doesn't exist: qbt-overview-card"**: the resource isn't loaded yet. Reload the browser (on the companion app: **Settings → Companion app → Debugging → Reset frontend cache**) and check the resource is listed under **Settings → Dashboards → Resources**.
-- **The torrents card says it needs a newer integration**: update qBittorrent (Advanced) to 0.2.6 or newer and restart Home Assistant.
+- **The torrents or top card says it needs a newer integration**: update qBittorrent (Advanced) to 0.2.6 or newer and restart Home Assistant.
 - **"No qBittorrent (Advanced) device found"**: the integration isn't set up, or the configured `device_id` no longer exists. Pick the instance again in the card editor.
 - **The speed graph is empty**: the speed sensors have no recorded history yet (or are excluded from the recorder). It fills in while the dashboard is open.
 

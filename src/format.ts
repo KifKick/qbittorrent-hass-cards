@@ -120,8 +120,11 @@ export const formatProgress = (hass: HomeAssistant | undefined, progress: number
 export const formatRatio = (hass: HomeAssistant | undefined, ratio: number): string =>
   ratio < 0 || ratio >= 9999 ? "∞" : formatNumber(hass, ratio, 2);
 
-export const formatEta = (seconds: number): string => {
-  if (!Number.isFinite(seconds) || seconds < 0 || seconds >= ETA_INFINITE) return "∞";
+export const formatEta = (seconds: number): string =>
+  !Number.isFinite(seconds) || seconds < 0 || seconds >= ETA_INFINITE ? "∞" : formatDuration(seconds);
+
+/** A duration in its two largest units ("3 d 4 h", "12 min"). */
+export const formatDuration = (seconds: number): string => {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);

@@ -14,12 +14,14 @@ import {
   OVERVIEW_SECTIONS,
   SORTS,
   STATS,
+  TOP_METRICS,
   TORRENT_DETAILS,
 } from "./const";
 import { getQbtDevices } from "./discovery";
 import { fireEvent, type HomeAssistant, type LovelaceCardConfig } from "./ha-types";
 import { type StringKey, t } from "./i18n";
 import { OVERVIEW_DEFAULTS } from "./overview-card";
+import { TOP_DEFAULTS } from "./top-card";
 import { TORRENTS_DEFAULTS } from "./torrents-card";
 
 type Schema = Record<string, unknown>;
@@ -56,6 +58,10 @@ const LABEL_KEYS: Record<string, StringKey> = {
   details: "ed_details",
   show_actions: "ed_show_actions",
   units: "ed_units",
+  metric: "ed_metric",
+  count: "ed_count",
+  show_bars: "ed_show_bars",
+  metrics: "ed_metrics",
 };
 
 const unitsSchema = (hass: HomeAssistant | undefined): Schema => ({
@@ -74,6 +80,7 @@ const unitsSchema = (hass: HomeAssistant | undefined): Schema => ({
 const HELPER_KEYS: Record<string, StringKey> = {
   filters: "ed_filters_helper",
   category: "ed_category_helper",
+  metrics: "ed_metrics_helper",
 };
 
 abstract class QbtEditor<C extends LovelaceCardConfig> extends LitElement {
@@ -88,6 +95,11 @@ abstract class QbtEditor<C extends LovelaceCardConfig> extends LitElement {
   protected abstract _schema(): Schema[];
 
   protected abstract _defaults(): Record<string, unknown>;
+
+  /** Labels that differ from the shared ones for this card. */
+  protected get _labels(): Record<string, StringKey> {
+    return {};
+  }
 
   protected _deviceSchema(): Schema {
     return {
@@ -104,8 +116,10 @@ abstract class QbtEditor<C extends LovelaceCardConfig> extends LitElement {
       .hass=${this.hass}
       .data=${{ ...this._defaults(), ...this._config }}
       .schema=${this._schema()}
-      .computeLabel=${(schema: Schema) =>
-        LABEL_KEYS[schema.name as string] ? t(this.hass, LABEL_KEYS[schema.name as string]) : undefined}
+      .computeLabel=${(schema: Schema) => {
+        const key = this._labels[schema.name as string] ?? LABEL_KEYS[schema.name as string];
+        return key ? t(this.hass, key) : undefined;
+      }}
       .computeHelper=${(schema: Schema) =>
         schema.name === "device_id" && noDevices
           ? t(this.hass, "ed_no_devices")
@@ -241,6 +255,78 @@ export class QbtTorrentsCardEditor extends QbtEditor<LovelaceCardConfig> {
           {
             name: "refresh_interval",
             selector: { number: { min: 5, max: 300, mode: "box", unit_of_measurement: "s" } },
+          },
+        ],
+      },
+    ];
+  }
+}
+
+export class QbtTopCardEditor extends QbtEditor<LovelaceCardConfig> {
+  protected override get _labels(): Record<string, StringKey> {
+    return {
+      filter: "ed_top_filter",
+      ...((this._config?.metrics as string[] | undefined)?.length ? { metric: "ed_metric_default" } : {}),
+    };
+  }
+
+  protected _defaults() {
+    return { ...TOP_DEFAULTS };
+  }
+
+  protected _schema(): Schema[] {
+    const hass = this.hass;
+    return [
+      this._deviceSchema(),
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          {
+            name: "metric",
+            selector: {
+              select: { mode: "dropdown", options: options(hass, Object.keys(TOP_METRICS), "metric_") },
+            },
+          },
+          { name: "count", selector: { number: { min: 1, max: 50, mode: "box" } } },
+          {
+            name: "filter",
+            selector: { select: { mode: "dropdown", options: options(hass, FILTERS, "filter_") } },
+          },
+        ],
+      },
+      { name: "metrics", ...multiSelect(hass, Object.keys(TOP_METRICS), "metric_") },
+      {
+        name: "",
+        type: "expandable",
+        flatten: true,
+        icon: "mdi:text-short",
+        title: t(hass, "ed_content"),
+        schema: [
+          {
+            type: "grid",
+            name: "",
+            schema: [
+              { name: "title", selector: { text: {} } },
+              { name: "icon", selector: { icon: {} } },
+            ],
+          },
+          { name: "show_bars", selector: { boolean: {} } },
+          unitsSchema(hass),
+        ],
+      },
+      {
+        name: "",
+        type: "expandable",
+        flatten: true,
+        icon: "mdi:tune-variant",
+        title: t(hass, "ed_advanced"),
+        schema: [
+          { name: "category", selector: { text: {} } },
+          { name: "tag", selector: { text: {} } },
+          {
+            name: "refresh_interval",
+            selector: { number: { min: 5, max: 600, mode: "box", unit_of_measurement: "s" } },
           },
         ],
       },

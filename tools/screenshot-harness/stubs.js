@@ -130,8 +130,11 @@ export const makeHass = ({ language = "pl", dark = false, overrides = {} } = {})
           seeding: (t) => t.progress >= 1 && !t.state.startsWith("stopped"),
           active: (t) => t.dlspeed > 0 || t.upspeed > 0,
         };
-        const match = filters[msg.service_data.status_filter] ?? (() => true);
-        return { context: {}, response: { torrents: TORRENTS.filter(match).slice(0, msg.service_data.limit) } };
+        const { status_filter, sort, reverse, limit } = msg.service_data;
+        const match = filters[status_filter] ?? (() => true);
+        const list = TORRENTS.filter(match);
+        if (sort) list.sort((a, b) => (a[sort] > b[sort] ? 1 : a[sort] < b[sort] ? -1 : 0) * (reverse ? -1 : 1));
+        return { context: {}, response: { torrents: list.slice(0, limit) } };
       }
       throw new Error("unexpected " + msg.type);
     },
@@ -158,19 +161,21 @@ const T = (name, state, progress, extra = {}) => ({
   num_leechs: 0,
   num_incomplete: 3,
   force_start: false,
+  uploaded: (extra.ratio ?? 0) * (extra.size ?? 4.2e9),
+  seeding_time: progress >= 1 ? 86400 * 3 : 0,
   ...extra,
 });
 
 const TORRENTS = [
-  T("debian-13.1.0-amd64-DVD-1.iso", "downloading", 0.6342, { dlspeed: 9_800_000, upspeed: 420_000, eta: 1260, size: 3.9e9, num_seeds: 48, category: "linux", tags: "iso, debian" }),
+  T("debian-13.1.0-amd64-DVD-1.iso", "downloading", 0.6342, { dlspeed: 9_800_000, upspeed: 420_000, eta: 1260, size: 3.9e9, num_seeds: 48, num_leechs: 3, uploaded: 0.52e9, category: "linux", tags: "iso, debian" }),
   T("Big Buck Bunny (2008) [2160p HDR]", "forcedDL", 0.2251, { dlspeed: 2_630_000, eta: 5400, size: 13.7e9, force_start: true, category: "movies", tags: "2160p, HDR" }),
   T("ubuntu-26.04-desktop-amd64.iso", "stalledDL", 0.9995, { size: 6.1e9, category: "linux" }),
-  T("Sintel.2010.1080p.mkv", "uploading", 1, { upspeed: 760_000, ratio: 3.0453, size: 2.2e9, category: "movies" }),
-  T("archlinux-2026.10.01-x86_64.iso", "stalledUP", 1, { ratio: 12.31, size: 1.4e9, category: "linux" }),
+  T("Sintel.2010.1080p.mkv", "uploading", 1, { upspeed: 760_000, ratio: 3.0453, size: 2.2e9, num_leechs: 6, seeding_time: 86400 * 9 + 7200, category: "movies" }),
+  T("archlinux-2026.10.01-x86_64.iso", "stalledUP", 1, { ratio: 12.31, size: 1.4e9, num_leechs: 2, seeding_time: 86400 * 41, category: "linux" }),
   T("Tears of Steel [4K remux]", "checkingUP", 0.4120, { size: 38.5e9 }),
   T("fedora-workstation-43.iso", "queuedDL", 0, { size: 2.3e9 }),
-  T("Elephants Dream (2006)", "missingFiles", 1, { size: 0.8e9, ratio: 1.02 }),
-  T("LibreOffice_26.2_Linux_x86-64_deb.tar.gz", "stoppedUP", 1, { ratio: 0.48, size: 0.33e9 }),
+  T("Elephants Dream (2006)", "missingFiles", 1, { size: 0.8e9, ratio: 1.02, seeding_time: 86400 * 120 }),
+  T("LibreOffice_26.2_Linux_x86-64_deb.tar.gz", "stoppedUP", 1, { ratio: 0.48, size: 0.33e9, seeding_time: 86400 * 2 + 3600 * 5 }),
   T("openSUSE-Tumbleweed-DVD-x86_64-Current.iso", "stoppedDL", 0.31, { size: 4.6e9 }),
   T("extra", "stalledUP", 1),
 ];

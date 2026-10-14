@@ -15,7 +15,7 @@ import { type ByteUnits, formatBytes, formatDate, formatNumber, formatRatio } fr
 import type { HomeAssistant } from "./ha-types";
 import { type StringKey, t } from "./i18n";
 import { baseStyles } from "./styles";
-import { type Torrent, torrentState, torrentSummary } from "./torrent";
+import { fetchTorrents, loadErrorText, type Torrent, torrentState, torrentSummary } from "./torrent";
 
 export interface TorrentsCardConfig extends QbtCardConfig {
   title?: string;
@@ -164,24 +164,16 @@ export class QbtTorrentsCard extends QbtBaseCard<TorrentsCardConfig> {
     const limit = this._limit;
     this._loading = true;
     try {
-      const result = await hass.callWS<{ response: { torrents: Torrent[] } }>({
-        type: "call_service",
-        domain: DOMAIN,
-        service: "get_torrents",
-        service_data: {
-          config_entry_id: entryId,
-          status_filter: this._activeFilter,
-          sort: this._cfg.sort,
-          reverse: this._cfg.reverse,
-          // One extra tells us whether there's another page.
-          limit: limit + 1,
-          ...(this._cfg.category ? { category: this._cfg.category } : {}),
-          ...(this._cfg.tag ? { tag: this._cfg.tag } : {}),
-        },
-        return_response: true,
+      const torrents = await fetchTorrents(hass, entryId, {
+        status_filter: this._activeFilter,
+        sort: String(this._cfg.sort),
+        reverse: Boolean(this._cfg.reverse),
+        // One extra tells us whether there's another page.
+        limit: limit + 1,
+        category: this._cfg.category,
+        tag: this._cfg.tag,
       });
       if (requestId !== this._requestId) return;
-      const torrents = result.response?.torrents ?? [];
       this._hasMore = torrents.length > limit;
       this._torrents = torrents.slice(0, limit);
       this._error = undefined;
@@ -352,13 +344,9 @@ export class QbtTorrentsCard extends QbtBaseCard<TorrentsCardConfig> {
   private _renderBody() {
     const hass = this._hass!;
     if (this._error && !this._torrents) {
-      // Integration versions before the `limit` option reject it in the schema.
-      const outdated = /extra keys not allowed.*limit/i.test(this._error);
       return html`<div class="message error">
         <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
-        <span class="grow"
-          >${outdated ? t(hass, "needs_update") : t(hass, "load_error", { error: this._error })}</span
-        >
+        <span class="grow">${loadErrorText(hass, this._error)}</span>
         <button class="chip" @click=${() => this._fetch()}><span>${t(hass, "retry")}</span></button>
       </div>`;
     }

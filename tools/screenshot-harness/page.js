@@ -30,6 +30,16 @@ const SCENARIOS = {
   "docs-torrents": [
     ["qbt-torrents-card", { title: "Torrents", filter: "downloading", limit: 5 }, {}, 460],
   ],
+  "docs-top": [
+    ["qbt-top-card", { metrics: ["uploaded", "upspeed", "ratio", "num_leechs", "seeding_time"] }, {}, 420],
+    ["qbt-top-card", { metric: "upspeed", filter: "active", count: 3 }, {}, 420],
+  ],
+  top: [
+    ["qbt-top-card", { metric: "ratio", metrics: ["uploaded", "upspeed", "ratio", "num_leechs", "seeding_time"] }, {}, 340],
+    ["qbt-top-card", { metric: "ratio", count: 10 }, {}, 360],
+    ["qbt-top-card", { metric: "num_leechs", filter: "seeding" }, {}, 360],
+    ["qbt-top-card", { metric: "seeding_time", show_bars: false, title: "Najdłużej seedowane" }, {}, 360],
+  ],
   states: [
     ["qbt-overview-card", {}, { "binary_sensor.connectivity": "off", "sensor.dl_speed": "unavailable", "sensor.up_speed": "unavailable" }, 420],
     ["qbt-overview-card", { layout: "compact", controls: ["alt_speed", "pause_all"] }, { "switch.alt_speed_limits": "on", "sensor.dl_speed": "0.0", "sensor.up_speed": "0.85" }, 300],

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0] - 2026-10-14
+
+### Added
+
+- `qbt-top-card`: top-N torrents by upload, share ratio, upload/download speed, leechers, seeding time or size, with bars against the leader; a fixed ranking, or several to switch between with chips (`metrics`); optional filter, category and tag.
+
+### Changed
+
+- The torrents card and the new top card share one `qbt.get_torrents` helper.
+
+### Fixed
+
+- Loading the bundle twice (e.g. a manual resource next to the HACS one) now registers the cards a newer copy adds, instead of skipping everything when an older copy loaded first.
+
 ## [0.1.0] - 2026-10-12
 
 ### Added
